@@ -1,0 +1,181 @@
+//pm2018 macro
+//Find_Surface_Clearance.mac Ver0.0.3
+//ﾓﾃﾞﾙの隙間とﾊﾞｯﾄﾞｻｰﾌｪｽの検索
+//---------------------------------------------------------------------------------------------------
+//ver0.0.1-完成
+//ver0.0.2-ﾄﾚﾗﾝｽ見直し
+//ver0.0.3-ﾒｯｼｭﾄﾚﾗﾝｽ複数入力化,確認ﾀﾞｲｱﾛｸﾞ追加,ﾊﾞｳﾝﾀﾞﾘ重複名対応
+//				不良面ﾒｯｾｰｼﾞ追加
+//---------------------------------------------------------------------------------------------------
+
+function Main() {
+	real MeshTolDef = 0.005 //ﾒｯｼｭﾄﾚﾗﾝｽ-ﾃﾞﾌｫﾙﾄ
+	real ClearTolDef= 0.01 //隙間ﾄﾚﾗﾝｽ-ﾃﾞﾌｫﾙﾄ
+	
+	//**ﾕｰｻﾞｰ選択**
+	//ﾓﾃﾞﾙ
+	string msg = '隙間と不良面をﾁｪｯｸするﾓﾃﾞﾙを選択してください'
+	string list models = input entity multiple model $msg
+	if is_empty(models) {
+		return
+	}
+	
+	//ｻｰﾌｪｽ方向
+	$msg = 'ｻｰﾌｪｽ方向処理を行いますか?'
+	bool NormalFg= 0
+	$NormalFg= QUERY $msg
+	
+	//ﾒｯｼｭﾄﾚﾗﾝｽ
+	$msg = '不良面ﾁｪｯｸﾄﾚﾗﾝｽを入力して下さい : 例)0005,0.1'
+	real list MeshTols = {}
+	call InputString2Real($Msg, $MeshTolDef , $MeshTols)
+	
+	//隙間ﾄﾚﾗﾝｽ
+	$msg = '隙間ﾁｪｯｸﾄﾚﾗﾝｽを入力して下さい'	
+	real ClearTol  = -1
+	call InputReal($Msg, $ClearTolDef , $ClearTol )
+	
+	//確認
+	$msg = '対象ﾓﾃﾞﾙ : ' + join($models, ' , ') + crlf
+	$msg = $msg + 'ｻｰﾌｪｽ方向処理 : '
+	if NormalFg {
+		$msg = $msg + '一致処理行う' + crlf
+	} else {
+		$msg = $msg + 'そのまま' + crlf
+	}
+	$msg = $msg + '不良面ﾁｪｯｸﾄﾚﾗﾝｽ : ' + join($MeshTols, ' , ') + crlf
+	$msg = $msg + '隙間ﾁｪｯｸﾄﾚﾗﾝｽ : ' + $ClearTol + crlf
+	bool yn  = 0
+	$yn = QUERY $msg
+	if not $yn {
+		macro abort
+	}	
+
+	//**処理**
+	call Msgoff()
+	
+	//ｻｰﾌｪｽ方向
+	if $NormalFg {
+		call Exec_OrientNormals($models)
+	} 
+	
+	//BadSurfaces
+	string bad = ''
+	call Exec_BadSurfaces($models, $MeshTols, $bad) 
+	
+	//ﾊﾞｳﾝﾀﾞﾘ作成
+	call Create_Boundary($models, $ClearTol ) 
+	
+	call Msgon()
+	message info 'Done' + crlf + $bad
+}
+
+//不良面
+function Exec_BadSurfaces(string list Models, real list Tols, output string out) {
+	$out = ''
+	EDIT MODEL ALL DESELECT ALL
+	foreach name in $Models {
+		EDIT MODEL $name SELECT ALL
+	}	
+	
+	foreach tol in tols {
+		real tol_r = real(tol)
+		string nxtset = new_entity_name('Level')
+		CREATE LEVEL ; MODELCOMPSET
+		EDIT LEVEL $nxtset ACQUIRE SELECTED
+		EDIT LEVEL $nxtset MESH $tol_r 
+		DELETE LEVEL $nxtset
+	}
+	
+	EDIT MODEL ALL DESELECT ALL	
+	VIEW MODEL ; SHADE NORMAL
+	
+	if entity_exists(entity('level' ,'Bad Surfaces')) {
+		$out = '不良面が有ります!!'
+	}
+}
+
+//ｻｰﾌｪｽ方向
+function Exec_OrientNormals(string list Models) {
+	EDIT MODEL ALL DESELECT ALL
+	foreach name in $Models {
+		EDIT MODEL $name SELECT ALL
+		EDIT MODEL $name ORIENT_NORMALS SELECTED
+	}	
+}
+
+//ﾊﾞｳﾝﾀﾞﾘ
+function Create_Boundary(string list Models, real Tol ) {
+	EDIT MODEL ALL DESELECT ALL
+	string Bouname = new_entity_name('Boundary')
+	string newname = join($Models, '_') + '_Checked-Tol_' + string($Tol)
+	foreach name in $Models {
+		EDIT MODEL $name SELECT ALL
+	}		
+	CREATE BOUNDARY ; SKETCH FORM BOUNDARY
+	EDIT BOUNDARY $Bouname TOLERANCE $Tol
+	EDIT BOUNDARY $Bouname INSERT MODEL
+	call GetNewName('Boundary' , $newname , $newname)
+	RENAME BOUNDARY $Bouname $newname
+	
+	EDIT BOUNDARY $newname ACCEPT BOUNDARY ACCEPT
+	EDIT MODEL ALL DESELECT ALL
+}
+//数値入力 不正時は-1を返す
+function InputReal(string Msg, real Defreal, output real  Outreal) {
+	$Outreal = -1
+	real res = $Defreal
+	$res = input $Msg
+	bool err = 0
+	$err = error $res
+	if $err {
+		message error '数値を入力して下さい!'
+		macro about
+	} 
+	if $res <=0 {
+		message error '0以上の数値を入力して下さい!'
+		macro about
+	} 	
+	$Outreal = $res
+}
+
+
+//数値変換可能な文字入力 不正時は空ﾘｽﾄを返す
+function InputString2Real(string Msg, real Defreal, output real list Out) {
+	$Out = {}
+	string res = $Defreal
+	$res = input $Msg
+	string list lst = tokens($res, ',')
+	foreach s in $lst {
+		real r = real($s)
+		if $r > 0 {
+			int dmy = add_last($Out, $r)
+		}
+	}
+	if size($Out) < 1 {
+		message error '入力値が不正です!!'
+		macro about
+	}
+}
+
+//新たな名前の取得
+Function GetNewName(string folder , string name , output string out) {
+	if entity_exists(entity($folder ,$name)) < 1 {
+		$out = $name
+	} else {
+		$out = new_entity_name($folder ,$name)
+	}
+	return
+}
+
+function Msgoff() {
+	graphics lock
+	dialogs message off
+	dialogs error off
+}
+
+function Msgon() {
+	graphics unlock
+	dialogs message on
+	dialogs error on
+}
