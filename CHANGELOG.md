@@ -1,5 +1,8 @@
 # Change of PowerMill-Find_Surface_Clearance
 
+## 0.0.4
++ 重複面検索追加
+
 ## 0.0.3
 + ﾒｯｼｭﾄﾚﾗﾝｽ複数入力化
 + 確認ﾀﾞｲｱﾛｸﾞ追加
