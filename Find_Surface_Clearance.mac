@@ -1,11 +1,12 @@
 //pm2018 macro
-//Find_Surface_Clearance.mac Ver0.0.3
+//Find_Surface_Clearance.mac Ver0.0.4
 //ﾓﾃﾞﾙの隙間とﾊﾞｯﾄﾞｻｰﾌｪｽの検索
 //---------------------------------------------------------------------------------------------------
 //ver0.0.1-完成
 //ver0.0.2-ﾄﾚﾗﾝｽ見直し
 //ver0.0.3-ﾒｯｼｭﾄﾚﾗﾝｽ複数入力化,確認ﾀﾞｲｱﾛｸﾞ追加,ﾊﾞｳﾝﾀﾞﾘ重複名対応
 //				不良面ﾒｯｾｰｼﾞ追加
+//ver0.0.4-弱い重複面チェック追加
 //---------------------------------------------------------------------------------------------------
 
 function Main() {
@@ -63,11 +64,55 @@ function Main() {
 	string bad = ''
 	call Exec_BadSurfaces($models, $MeshTols, $bad) 
 	
+	//overlap
+	string over = ''
+	call GetOverlap($models, $over) 
+
 	//ﾊﾞｳﾝﾀﾞﾘ作成
 	call Create_Boundary($models, $ClearTol ) 
 	
 	call Msgon()
-	message info 'Done' + crlf + $bad
+	message info 'Done' + crlf + $bad + crlf + $over
+}
+
+// 重複面チェック
+function GetOverlap(string list Models, output string out) {
+	$out = ''
+	EDIT MODEL ALL DESELECT ALL
+	foreach name in $Models {
+		EDIT MODEL $name SELECT ALL
+	}
+
+	EDIT MODEL ALL DUPLICATE_SURFACES SELECT
+
+	string lvName = new_entity_name('level')
+	CREATE LEVEL ; MODELCOMPSET
+	EDIT LEVEL $lvName ACQUIRE SELECTED
+	
+	int olCount = 0
+	call GetLevelCount($lvName, $olCount)
+	if $olCount > 0 {
+		string newName = 'Overlap'
+		call GetNewName('Boundary' , $newName , $newName)
+		RENAME Level $lvName $newName
+		$out = '重複面あります!!'
+	} else {
+		DELETE LEVEL $lvName
+	}
+}
+
+// レベル・セット内の数
+function GetLevelCount(string levelStr, output int out) {
+	EDIT MODEL ALL DESELECT ALL
+	EDIT LEVEL $levelStr SELECT ALL
+
+	INT $numberSelected = 0
+	FOREACH $Mod IN FOLDER('model') {
+		$numberSelected =  $numberSelected + number_selected($entity('model',$Mod.name).components)
+	}
+
+	$out = $numberSelected
+	EDIT MODEL ALL DESELECT ALL
 }
 
 //不良面
@@ -121,6 +166,7 @@ function Create_Boundary(string list Models, real Tol ) {
 	EDIT BOUNDARY $newname ACCEPT BOUNDARY ACCEPT
 	EDIT MODEL ALL DESELECT ALL
 }
+
 //数値入力 不正時は-1を返す
 function InputReal(string Msg, real Defreal, output real  Outreal) {
 	$Outreal = -1
