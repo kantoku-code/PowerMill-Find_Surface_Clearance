@@ -1,7 +1,7 @@
 # PowerMill-Find_Surface_Clearance
 これは、オートデスクソフトウェア「PowerMill」のマクロです。
 
-取り込んだCADデータの不良面(Bad Surfaces)の検索と、面の隙間の検索を行います。
+取り込んだCADデータの不良面(Bad Surfaces)と重複面の検索と、面の隙間の検索を行います。
 不良面となるデータのサンプルは[こちら](https://grabcad.com/library/powermill_badsurfces_example-1)にあります。
 
 ### インストール:
@@ -53,7 +53,7 @@
 
 ### アクション:
 以下の環境で確認しています。
- + Autodesk PowerMill Standard 2020.1.0.2020113
+ + Autodesk PowerMill Standard 2020.2.0.2020132
  + Windows10 64bit Pro
 
 ### ライセンス:
